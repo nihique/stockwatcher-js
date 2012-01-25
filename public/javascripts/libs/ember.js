@@ -1608,7 +1608,7 @@ if ('undefined' === typeof Ember) {
 /**
   @namespace
   @name Ember
-  @version 0.9.3
+  @version 0.9.4
 
   All Ember methods and functions are defined inside of this namespace.
   You generally should not add new properties to this namespace as it may be
@@ -1640,10 +1640,10 @@ if ('undefined' !== typeof window) {
 /**
   @static
   @type String
-  @default '0.9.3'
+  @default '0.9.4'
   @constant
 */
-Ember.VERSION = '0.9.3';
+Ember.VERSION = '0.9.4';
 
 /**
   @static
@@ -2031,7 +2031,7 @@ if (Object.freeze) Object.freeze(EMPTY_META);
   The meta object contains information about computed property descriptors as
   well as any watched properties and other information.  You generally will
   not access this information directly but instead work with higher level 
-  methods that manipulate this has indirectly.
+  methods that manipulate this hash indirectly.
 
   @param {Object} obj
     The object to retrieve meta for
@@ -11536,7 +11536,11 @@ Ember.View = Ember.Object.extend(
         property = split[0],
         className = split[1];
 
-    var val = Ember.getPath(this, property);
+    // TODO: Remove this `false` when the `getPath` globals support is removed
+    var val = Ember.getPath(this, property, false);
+    if (val === undefined && Ember.isGlobalPath(property)) {
+      val = Ember.getPath(window, property);
+    }
 
     // If value is a Boolean and true, return the dasherized property
     // name.
@@ -13474,6 +13478,13 @@ Ember.ViewState = Ember.State.extend({
     var view = get(this, 'view'), root, childViews;
 
     if (view) {
+      if (Ember.View.detect(view)) {
+        view = view.create();
+        set(this, 'view', view);
+      }
+
+      ember_assert('view must be an Ember.View', view instanceof Ember.View);
+
       root = stateManager.get('rootView');
 
       if (root) {
@@ -13504,7 +13515,6 @@ Ember.ViewState = Ember.State.extend({
     }
   }
 });
-
 
 })({});
 
@@ -14325,37 +14335,6 @@ Ember.Button = Ember.View.extend(Ember.TargetActionSupport, {
 // Copyright: ©2011 Strobe Inc. and contributors.
 // License:   Licensed under MIT license (see license.js)
 // ==========================================================================
-var set = Ember.set, get = Ember.get;
-
-Ember.RadioButton = Ember.View.extend({
-  title: null,
-  checked: false,
-  group: "radio_button",
-  disabled: false,
-
-  classNames: ['ember-radio-button'],
-
-  defaultTemplate: Ember.Handlebars.compile('<label><input type="radio" {{bindAttr disabled="disabled" name="group" value="val" checked="checked"}}>{{title}}</label>'),
-
-  change: function() {
-    Ember.run.once(this, this._updateElementValue);
-  },
-
-  _updateElementValue: function() {
-    var input = this.$('input:radio');
-    set(this, 'value', input.attr('value'));
-  }
-});
-
-})({});
-
-
-(function(exports) {
-// ==========================================================================
-// Project:   Ember Handlebar Views
-// Copyright: ©2011 Strobe Inc. and contributors.
-// License:   Licensed under MIT license (see license.js)
-// ==========================================================================
 var get = Ember.get, set = Ember.set;
 
 /**
@@ -14424,6 +14403,93 @@ Ember.TabView = Ember.View.extend({
 
 
 (function(exports) {
+})({});
+
+
+(function(exports) {
+var set = Ember.set, get = Ember.get, getPath = Ember.getPath;
+
+Ember.Select = Ember.View.extend({
+  tagName: 'select',
+  template: Ember.Handlebars.compile(
+    '{{#if prompt}}<option>{{prompt}}</option>{{/if}}' +
+    '{{#each content}}{{view Ember.SelectOption contentBinding="this"}}{{/each}}'
+  ),
+
+  content: null,
+  selection: null,
+  prompt: null,
+
+  optionLabelPath: 'content',
+  optionValuePath: 'content',
+
+
+  didInsertElement: function() {
+    var selection = get(this, 'selection');
+
+    if (selection) { this.selectionDidChange(); }
+
+    this.change();
+  },
+
+  change: function() {
+    var selectedIndex = this.$()[0].selectedIndex,
+        content = get(this, 'content'),
+        prompt = get(this, 'prompt');
+
+    if (!content) { return; }
+    if (prompt && selectedIndex === 0) { set(this, 'selection', null); return; }
+
+    if (prompt) { selectedIndex -= 1; }
+    set(this, 'selection', content.objectAt(selectedIndex));
+  },
+
+  selectionDidChange: Ember.observer(function() {
+    var el = this.$()[0],
+        content = get(this, 'content'),
+        selection = get(this, 'selection'),
+        selectionIndex = content.indexOf(selection),
+        prompt = get(this, 'prompt');
+
+    if (prompt) { selectionIndex += 1; }
+    if (el) { el.selectedIndex = selectionIndex; }
+  }, 'selection')
+});
+
+Ember.SelectOption = Ember.View.extend({
+  tagName: 'option',
+  template: Ember.Handlebars.compile("{{label}}"),
+  attributeBindings: ['value'],
+
+  init: function() {
+    this.labelPathDidChange();
+    this.valuePathDidChange();
+
+    this._super();
+  },
+
+  labelPathDidChange: Ember.observer(function() {
+    var labelPath = getPath(this, 'parentView.optionLabelPath');
+
+    if (!labelPath) { return; }
+
+    Ember.defineProperty(this, 'label', Ember.computed(function() {
+      return getPath(this, labelPath);
+    }).property(labelPath).cacheable());
+  }, 'parentView.optionLabelPath'),
+
+  valuePathDidChange: Ember.observer(function() {
+    var valuePath = getPath(this, 'parentView.optionValuePath');
+
+    if (!valuePath) { return; }
+
+    Ember.defineProperty(this, 'value', Ember.computed(function() {
+      return getPath(this, valuePath);
+    }).property(valuePath).cacheable());
+  }, 'parentView.optionValuePath')
+});
+
+
 })({});
 
 
@@ -15431,6 +15497,64 @@ Ember.Handlebars.registerHelper('template', function(name, options) {
   ember_assert("Unable to find template with name '"+name+"'.", !!template);
 
   Ember.TEMPLATES[name](this, { data: options.data });
+});
+
+})({});
+
+
+(function(exports) {
+var EmberHandlebars = Ember.Handlebars, getPath = Ember.Handlebars.getPath;
+
+var ActionHelper = EmberHandlebars.ActionHelper = {};
+
+ActionHelper.registerAction = function(actionName, eventName, target, view) {
+  var actionId = (++jQuery.uuid).toString(),
+      existingHandler = view[eventName],
+      handler;
+
+  if (existingHandler) {
+    var handler = function(event) {
+      var ret;
+      if ($(event.target).closest('[data-ember-action]').attr('data-ember-action') === actionId) {
+        ret = target[actionName](event);
+      }
+      return ret !== false ? existingHandler.call(view, event) : ret;
+    };
+  } else {
+    var handler = function(event) {
+      if ($(event.target).closest('[data-ember-action]').attr('data-ember-action') === actionId) {
+        return target[actionName](event);
+      }
+    };
+  }
+
+  view[eventName] = handler;
+
+  view.reopen({
+    rerender: function() {
+      if (existingHandler) {
+        view[eventName] = existingHandler;
+      } else {
+        view[eventName] = null;
+      }
+      return this._super();
+    }
+  });
+
+  return actionId;
+};
+
+EmberHandlebars.registerHelper('action', function(actionName, options) {
+  var hash = options.hash || {},
+      eventName = options.hash.on || "click",
+      view = options.data.view,
+      target;
+
+  if (view.isVirtual) { view = view.get('parentView'); }
+  target = options.hash.target ? getPath(this, options.hash.target) : view;
+
+  var actionId = ActionHelper.registerAction(actionName, eventName, target, view);
+  return new EmberHandlebars.SafeString('data-ember-action="' + actionId + '"');
 });
 
 })({});
