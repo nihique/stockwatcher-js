@@ -9,8 +9,11 @@ App.Stock = Em.Object.extend({
 });
 
 App.stocks = [
-	App.Stock.create({ ticker: "MSFT" }),
-	App.Stock.create({ ticker: "AMZN" })
+  App.Stock.create({ ticker: "AAPL" }),
+  App.Stock.create({ ticker: "AMZN" }),
+  App.Stock.create({ ticker: "GOOG" }),
+	App.Stock.create({ ticker: "INTC" }),
+  App.Stock.create({ ticker: "MSFT" })
 ];
 
 App.stocksController = Em.ArrayProxy.create({
