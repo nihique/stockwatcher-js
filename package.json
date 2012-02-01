@@ -1,10 +1,10 @@
 {
-    "name": "application-name"
+    "name": "stockwatcher"
   , "version": "0.0.1"
   , "private": true
   , "dependencies": {
-      "express": "2.5.5"
-    , "jade": ">= 0.0.1"
-    , "request": ">= 2.9.3"
+      "express": ">= 2.5.5"
+    , "jade": ">= 0.20.0"
+    , "request": ">= 2.9.100"
   }
 }
