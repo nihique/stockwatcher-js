@@ -6,12 +6,12 @@ App.constants = {
 
 App.Stock = Em.Object.extend({
 	ticker: '',
+  name: '',
   property1: '',
   property2: '',
   property3: '',
   property4: '',
   property5: '',
-  property6: '',
   property7: '',
   property8: '',
   property9: '',
@@ -56,12 +56,12 @@ App.stocksController = Em.ArrayProxy.create({
     var stocks = csvObject.map(function (item, index, self) {
       return App.Stock.create({
         ticker: item[0],
+        name: item[6],
         property1: item[1],
         property2: item[2],
         property3: item[3],
         property4: item[4],
         property5: item[5],
-        property6: item[6],
         property7: item[7],
         property8: item[8],
         property9: item[9],
